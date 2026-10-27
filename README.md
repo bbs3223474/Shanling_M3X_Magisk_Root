@@ -1,5 +1,13 @@
 ### 【本Repo所有代码，以及本README均由Deepseek Harness开发实现，所有代码均为AI生成，欢迎各位审阅，本人不对此Repo的引用、转载、修改、重发布做任何限制和版权声明】
 
+**写在开头：** 山灵M3X是一台我吃灰已久的播放器，由于官方为其开发的Android 7.1.1系统限制颇多，包括但不限：设置菜单中没有“无障碍”入口、Fastboot完全阉割了flash、boot、oem、reboot等可用于刷写的命令、开机强行进入自带的Launcher3，即使安装了第三方桌面，也会自动将其恢复为Launcher3等等。
+
+为了解决上述问题，我尝试使用Deepseek Harness进行处理，最终结果也比较让人满意。
+
+当然了，“无障碍”入口因为官方编译Settings.apk时完全删除了Activity，所以无法恢复。但既然已经获得了Root权限，这个问题的影响就不是很大了。
+
+**以下说明由AI编写，本人对内容进行小部分删改。**
+
 # 山灵 M3X (msm8937 / Android 7.1.1) root 与系统改造记录
 
 ## 0. 结果概览
@@ -7,10 +15,8 @@
 | 项目 | 状态 |
 |---|---|
 | Root (Magisk 27.0) | ✅ 已生效，`su -c id` → `uid=0 context=u:r:magisk:s0` |
-| 开机默认桌面不再弹框 | ✅ 已修复，开机自动进入 Nova |
-| 无障碍服务可启用 | ✅ 可用脚本控制（菜单 UI 无法恢复） |
+| 开机默认桌面不再弹框 | ✅ 已通过建立Magisk模块修复，开机自动进入 第三方桌面 |
 | fastboot flash 恢复 | ❌ 不可行（见 §L1） |
-| 第三方 recovery (TWRP) | ⚠️ 不可直接移植（见 §L2），已完成完整备份 + 可用刷机通道 |
 
 设备：`Shanling_M3X`，`msm8937_64`，`ro.build.type=user`，`veritymode=enforcing`，`crypto.state=unencrypted`。
 
@@ -76,32 +82,8 @@ adb shell su -c "sh /data/adb/modules/m3x_launcher_fix/m3x-flash.sh flash boot /
 
 ---
 
-## L2. 关于「第三方 recovery」
 
-现状分析（`recovery_stock.img`，从 `/dev/block/bootdevice/by-name/recovery` 完整导出，64MB）：
-
-- 标准 AOSP recovery（boot image 格式，kernel + ramdisk，`sbin/recovery` 1.4MB）
-- `res/keys` 为 OTA 校验公钥（即 testkey 体系）
-- `init.rc` 中 adbd 为 `--device_banner=recovery`，`ALLOW_ADBD_ROOT=0`，因此 recovery 里也拿不到 root shell
-
-为什么不能直接刷个 TWRP：
-
-- TWRP 是**按机型编译**的（device tree 定义 fstab、屏幕、触摸、按键、分区布局），
-  没有 M3X 的 device tree 和内核源码，拿别的 msm8937 机型（如红米 4）的 TWRP 刷进去 =
-  黑屏/触摸失效/找不到分区，且可能连带把 recovery 搞坏。
-- 移植需要：Linux 编译环境 + TWRP(7.1 分支) 源码 + 该机内核/device tree，属于独立的长周期工程。
-
-已完成的实事：
-
-- 完整备份 recovery：`recovery_stock.img`（可随时 `m3x-flash.sh flash recovery recovery_stock.img` 还原）
-- 打通了「任意签名 OTA」通道：等于把 stock recovery 变成了**可以刷自签包**的 recovery
-  （第三方包只要能被重新签名/或改用 dd 刷写，就不受签名限制）
-
-如果后续确实要 TWRP，建议路线：先备份全分区 → 提取内核 config/dtb → 建 device tree → 云编译。
-
----
-
-## L3. 关于「设置里没有无障碍」
+## L2. 关于「设置里没有无障碍」
 
 根因（已确认，不是隐藏，是**被删掉了**）：
 
@@ -130,7 +112,7 @@ adb shell su -c "sh /data/adb/modules/m3x_launcher_fix/m3x-a11y.sh off"
 
 ---
 
-## L4. 关于「默认桌面每次都问」——已修复
+## L3. 关于「默认桌面每次都问」——已修复
 
 根因（logcat 实锤）：
 
@@ -227,7 +209,7 @@ D:\Desktop\m3x_root\
 ## 3. 风险与回滚
 
 - 不要刷 aboot / sbl / tz 等引导链分区，写错即硬砖。
-- boot 出问题：进 recovery（你已知按键组合）→「Apply update from SD card」→ 刷 `/sdcard/update.zip`（官方 boot）。
+- boot 出问题：进 recovery（编者案：**电源键+上一首**）→「Apply update from SD card」→ 刷 `/sdcard/update.zip`（官方 boot）。
 - 想彻底还原：`m3x-flash.sh flash boot boot_stock.img` + 在 Magisk App 里卸载 Magisk。
 - 想恢复 Launcher3：删除 `/data/adb/modules/m3x_launcher_fix/system/priv-app/Launcher3/` 后重启即可（systemless，不动 /system）。
 - OTA 大版本升级会覆盖 boot → root 丢失，升级后需重新用 `m3x_magisk_boot.zip` 刷一次（或在 Magisk 里「安装到未使用的分区/直接安装」）。
