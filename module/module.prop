@@ -1,0 +1,6 @@
+id=m3x_launcher_fix
+name=M3X Launcher Fix
+version=1.0
+versionCode=1
+author=dsh
+description=Fixes the repeated home-app chooser on Shanling M3X by removing conflicting preferred-activity entries before PackageManager starts.
